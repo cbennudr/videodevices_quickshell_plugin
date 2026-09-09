@@ -1,9 +1,16 @@
 # Video Devices
 
 An Omarchy bar plugin that shows a video-camera icon in the right section of
-the bar. Hover over the icon to see the names of video devices exposed through
-Linux's `/sys/class/video4linux` interface. The list refreshes every five
-seconds and does not require `v4l2-ctl` or any other extra package.
+the bar. Hover over the icon to see each video device's formats, resolutions,
+and frame rates. The list refreshes every five seconds.
+
+## Requirements
+
+`v4l2-ctl`, provided by the Arch Linux `v4l-utils` package:
+
+```bash
+omarchy pkg add v4l-utils
+```
 
 ## Install from this checkout
 

@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "author": "Connor Bennudriti",
   "license": "MIT",
-  "description": "Shows available video devices in the Omarchy bar",
+  "description": "Shows video device formats, resolutions, and frame rates in the Omarchy bar",
   "kinds": [
     "bar-widget"
   ],
@@ -14,7 +14,7 @@
   },
   "barWidget": {
     "displayName": "Video Devices",
-    "description": "Shows an icon whose tooltip lists the available video devices",
+    "description": "Shows an icon whose tooltip lists video device formats, resolutions, and frame rates",
     "category": "Hardware",
     "aliases": [
       "video",
