@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "connor.videodevices",
+  "name": "Video Devices",
+  "version": "0.0.0",
+  "author": "Connor Bennudriti",
+  "license": "MIT",
+  "description": "videodevices: a video device viewer",
+  "category": "Hardware",
+  "kinds": [
+    "overlay"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "overlay": "shell.qml"
+  }
+}
