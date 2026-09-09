@@ -2,14 +2,16 @@
 
 An Omarchy bar plugin that shows a video-camera icon in the right section of
 the bar. Hover over the icon to see each video device's formats, resolutions,
-and frame rates. The list refreshes every five seconds.
+and frame rates. Click a resolution/frame-rate row to preview that exact
+device, format, resolution, and frame rate with GStreamer. The list refreshes
+every five seconds.
 
 ## Requirements
 
-`v4l2-ctl`, provided by the Arch Linux `v4l-utils` package:
+The plugin uses `v4l2-ctl` for device capabilities and GStreamer for previews:
 
 ```bash
-omarchy pkg add v4l-utils
+omarchy pkg add v4l-utils gstreamer gst-plugins-base gst-plugins-good
 ```
 
 ## Install from this checkout

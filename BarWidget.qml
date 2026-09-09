@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
@@ -21,6 +22,65 @@ BarWidget {
 
   function refresh() {
     if (!deviceProcess.running) deviceProcess.running = true
+  }
+
+  function fpsFraction(fps) {
+    var value = Number(fps)
+    if (!isFinite(value) || value <= 0) return ""
+
+    if (Math.abs(value - 23.976) < 0.01) return "24000/1001"
+    if (Math.abs(value - 29.97) < 0.01) return "30000/1001"
+    if (Math.abs(value - 59.94) < 0.01) return "60000/1001"
+    if (Math.abs(value - Math.round(value)) < 0.001)
+      return Math.round(value) + "/1"
+
+    var numerator = Math.round(value * 1000)
+    var denominator = 1000
+    var a = numerator
+    var b = denominator
+    while (b !== 0) {
+      var remainder = a % b
+      a = b
+      b = remainder
+    }
+    return (numerator / a) + "/" + (denominator / a)
+  }
+
+  function launchFormat(nodePath, formatCode, width, height, fps) {
+    var rawFormatNames = {
+      "YUYV": "YUY2",
+      "YU12": "I420",
+      "RGB3": "RGB",
+      "BGR3": "BGR",
+      "GREY": "GRAY8"
+    }
+    var caps = ""
+    var decoder = ""
+
+    if (formatCode === "MJPG" || formatCode === "JPEG") {
+      caps = "image/jpeg"
+      decoder = "jpegdec"
+    } else if (formatCode === "H264") {
+      caps = "video/x-h264"
+      decoder = "decodebin"
+    } else if (formatCode === "HEVC") {
+      caps = "video/x-h265"
+      decoder = "decodebin"
+    } else {
+      var gstFormat = rawFormatNames[formatCode] || formatCode
+      caps = "video/x-raw,format=" + gstFormat
+    }
+
+    caps += ",width=" + width + ",height=" + height
+    var framerate = fpsFraction(fps)
+    if (framerate !== "") caps += ",framerate=" + framerate
+
+    var command = ["gst-launch-1.0", "v4l2src", "device=" + nodePath, "!", caps, "!"]
+    if (decoder !== "") command.push(decoder, "!")
+    command.push("videoconvert", "!", "autovideosink")
+
+    popupOpen = false
+    Quickshell.execDetached(command)
   }
 
   implicitWidth: button.implicitWidth
@@ -88,10 +148,11 @@ BarWidget {
 
           var formatMatch = line.match(/^\s*\[\d+\]:\s*'([^']+)'\s*(.*)$/)
           if (formatMatch !== null) {
+            var formatCode = formatMatch[1].trim()
             var description = formatMatch[2].trim()
-            var displayName = formatMatch[1]
+            var displayName = formatCode
               + (description === "" ? "" : " " + description)
-            currentFormat = { name: displayName, sizes: [] }
+            currentFormat = { code: formatCode, name: displayName, sizes: [] }
             currentNode.formats.push(currentFormat)
             currentSize = null
             continue
@@ -102,6 +163,7 @@ BarWidget {
           var sizeMatch = line.match(/^\s*Size:\s*(?:Discrete|Stepwise|Continuous)\s+(.+)$/)
           if (sizeMatch !== null) {
             var sizeName = sizeMatch[1].trim()
+            var dimensions = sizeName.match(/^(\d+)x(\d+)$/)
             currentSize = null
             for (var sizeIndex = 0; sizeIndex < currentFormat.sizes.length; sizeIndex++) {
               if (currentFormat.sizes[sizeIndex].name === sizeName) {
@@ -111,7 +173,12 @@ BarWidget {
             }
 
             if (currentSize === null) {
-              currentSize = { name: sizeName, intervals: [] }
+              currentSize = {
+                name: sizeName,
+                width: dimensions !== null ? Number(dimensions[1]) : 0,
+                height: dimensions !== null ? Number(dimensions[2]) : 0,
+                intervals: []
+              }
               currentFormat.sizes.push(currentSize)
             }
             continue
@@ -124,8 +191,19 @@ BarWidget {
             var intervalName = fpsMatch !== null
               ? Number(fpsMatch[1]).toString() + " fps"
               : intervalDescription
-            if (currentSize.intervals.indexOf(intervalName) < 0)
-              currentSize.intervals.push(intervalName)
+            var duplicateInterval = false
+            for (var intervalIndex = 0; intervalIndex < currentSize.intervals.length; intervalIndex++) {
+              if (currentSize.intervals[intervalIndex].name === intervalName) {
+                duplicateInterval = true
+                break
+              }
+            }
+            if (!duplicateInterval) {
+              currentSize.intervals.push({
+                name: intervalName,
+                fps: fpsMatch !== null ? Number(fpsMatch[1]) : 0
+              })
+            }
           }
         }
 
@@ -206,6 +284,7 @@ BarWidget {
             model: modelData.nodes
 
             delegate: Column {
+              id: nodeColumn
               required property var modelData
               width: parent.width
               spacing: Style.space(3)
@@ -236,7 +315,29 @@ BarWidget {
                 model: modelData.formats
 
                 delegate: Column {
+                  id: formatColumn
                   required property var modelData
+                  readonly property var choices: {
+                    var result = []
+                    for (var sizeIndex = 0; sizeIndex < modelData.sizes.length; sizeIndex++) {
+                      var size = modelData.sizes[sizeIndex]
+                      if (size.intervals.length === 0) {
+                        result.push({ name: size.name, width: size.width, height: size.height, fps: 0 })
+                        continue
+                      }
+
+                      for (var intervalIndex = 0; intervalIndex < size.intervals.length; intervalIndex++) {
+                        var interval = size.intervals[intervalIndex]
+                        result.push({
+                          name: size.name + " — " + interval.name,
+                          width: size.width,
+                          height: size.height,
+                          fps: interval.fps
+                        })
+                      }
+                    }
+                    return result
+                  }
                   x: Style.space(16)
                   width: parent.width - x
                   spacing: Style.space(2)
@@ -252,23 +353,49 @@ BarWidget {
                   }
 
                   Repeater {
-                    model: modelData.sizes
+                    model: formatColumn.choices
 
-                    delegate: Text {
+                    delegate: Rectangle {
+                      id: choiceButton
                       required property var modelData
-                      readonly property string detail: modelData.intervals.length > 0
-                        ? modelData.name + " — " + modelData.intervals.join(", ")
-                        : modelData.name
-
                       x: Style.space(16)
                       width: parent.width - x
-                      text: detail
-                      color: Color.foreground
-                      opacity: 0.85
-                      font.family: Style.font.family
-                      font.pixelSize: Style.font.bodySmall
-                      horizontalAlignment: Text.AlignLeft
-                      wrapMode: Text.Wrap
+                      height: choiceLabel.implicitHeight + Style.space(6)
+                      color: choiceMouse.containsMouse
+                        ? Style.hoverFillFor(root.bar ? root.bar.barForeground : Color.foreground, Color.accent)
+                        : "transparent"
+                      radius: Style.cornerRadius
+
+                      Text {
+                        id: choiceLabel
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.leftMargin: Style.space(4)
+                        anchors.rightMargin: Style.space(4)
+                        text: choiceButton.modelData.name
+                        color: choiceMouse.containsMouse ? Color.accent : Color.foreground
+                        font.family: Style.font.family
+                        font.pixelSize: Style.font.bodySmall
+                        font.underline: choiceMouse.containsMouse
+                        horizontalAlignment: Text.AlignLeft
+                        wrapMode: Text.Wrap
+                      }
+
+                      MouseArea {
+                        id: choiceMouse
+                        anchors.fill: parent
+                        enabled: choiceButton.modelData.width > 0 && choiceButton.modelData.height > 0
+                        hoverEnabled: enabled
+                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                        onClicked: root.launchFormat(
+                          nodeColumn.modelData.path,
+                          formatColumn.modelData.code,
+                          choiceButton.modelData.width,
+                          choiceButton.modelData.height,
+                          choiceButton.modelData.fps
+                        )
+                      }
                     }
                   }
                 }
