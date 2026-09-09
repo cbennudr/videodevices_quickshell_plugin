@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell.Io
+import qs.Commons
 import qs.Ui
 
 BarWidget {
@@ -7,36 +8,15 @@ BarWidget {
   moduleName: "connor.videodevices"
 
   property var devices: []
+  property bool popupOpen: false
 
-  readonly property string tooltip: {
-    if (devices.length === 0) return "No video devices available"
-
-    var lines = ["Video devices"]
-    for (var i = 0; i < devices.length; i++) {
-      lines.push(devices[i].name)
-      for (var j = 0; j < devices[i].nodes.length; j++) {
-        var node = devices[i].nodes[j]
-        lines.push("  " + node.path)
-
-        if (node.formats.length === 0) {
-          lines.push("    No formats reported")
-          continue
-        }
-
-        for (var k = 0; k < node.formats.length; k++) {
-          var format = node.formats[k]
-          lines.push("    " + format.name)
-          for (var sizeIndex = 0; sizeIndex < format.sizes.length; sizeIndex++) {
-            var size = format.sizes[sizeIndex]
-            var detail = size.intervals.length > 0
-              ? size.name + " — " + size.intervals.join(", ")
-              : size.name
-            lines.push("      " + detail)
-          }
-        }
-      }
+  function syncPopup() {
+    if (button.tooltipHovered || infoPopup.containsMouse) {
+      closePopupTimer.stop()
+      popupOpen = true
+    } else {
+      closePopupTimer.restart()
     }
-    return lines.join("\n")
   }
 
   function refresh() {
@@ -162,11 +142,150 @@ BarWidget {
     onTriggered: root.refresh()
   }
 
+  Timer {
+    id: closePopupTimer
+    interval: 150
+    onTriggered: {
+      if (!button.tooltipHovered && !infoPopup.containsMouse)
+        root.popupOpen = false
+    }
+  }
+
+  QtObject {
+    id: popupOwner
+    function close() { root.popupOpen = false }
+  }
+
+  PopupCard {
+    id: infoPopup
+    anchorItem: button
+    bar: root.bar
+    owner: popupOwner
+    triggerMode: "hover"
+    open: root.popupOpen
+    contentWidth: fittedContentWidth(Style.space(520))
+    contentHeight: fittedContentHeight(contentColumn.implicitHeight)
+
+    onContainsMouseChanged: root.syncPopup()
+
+    Column {
+      id: contentColumn
+      anchors.fill: parent
+      spacing: Style.space(10)
+
+      Text {
+        visible: root.devices.length === 0
+        width: parent.width
+        text: "No video devices available"
+        color: Color.foreground
+        font.family: Style.font.family
+        font.pixelSize: Style.font.body
+        horizontalAlignment: Text.AlignHCenter
+      }
+
+      Repeater {
+        model: root.devices
+
+        delegate: Column {
+          required property var modelData
+          width: contentColumn.width
+          spacing: Style.space(5)
+
+          Text {
+            width: parent.width
+            text: modelData.name
+            color: Color.foreground
+            font.family: Style.font.family
+            font.pixelSize: Style.font.heading
+            font.bold: true
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.Wrap
+          }
+
+          Repeater {
+            model: modelData.nodes
+
+            delegate: Column {
+              required property var modelData
+              width: parent.width
+              spacing: Style.space(3)
+
+              Text {
+                width: parent.width
+                text: modelData.path
+                color: Color.foreground
+                font.family: Style.font.family
+                font.pixelSize: Style.font.body
+                font.bold: true
+                horizontalAlignment: Text.AlignLeft
+              }
+
+              Text {
+                visible: modelData.formats.length === 0
+                x: Style.space(16)
+                width: parent.width - x
+                text: "No formats reported"
+                color: Color.foreground
+                opacity: 0.75
+                font.family: Style.font.family
+                font.pixelSize: Style.font.bodySmall
+                horizontalAlignment: Text.AlignLeft
+              }
+
+              Repeater {
+                model: modelData.formats
+
+                delegate: Column {
+                  required property var modelData
+                  x: Style.space(16)
+                  width: parent.width - x
+                  spacing: Style.space(2)
+
+                  Text {
+                    width: parent.width
+                    text: modelData.name
+                    color: Color.foreground
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.body
+                    horizontalAlignment: Text.AlignLeft
+                    wrapMode: Text.Wrap
+                  }
+
+                  Repeater {
+                    model: modelData.sizes
+
+                    delegate: Text {
+                      required property var modelData
+                      readonly property string detail: modelData.intervals.length > 0
+                        ? modelData.name + " — " + modelData.intervals.join(", ")
+                        : modelData.name
+
+                      x: Style.space(16)
+                      width: parent.width - x
+                      text: detail
+                      color: Color.foreground
+                      opacity: 0.85
+                      font.family: Style.font.family
+                      font.pixelSize: Style.font.bodySmall
+                      horizontalAlignment: Text.AlignLeft
+                      wrapMode: Text.Wrap
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   BarIconButton {
     id: button
     anchors.fill: parent
     bar: root.bar
     text: ""
-    tooltipText: root.tooltip
+    tooltipText: ""
+    onTooltipHoveredChanged: root.syncPopup()
   }
 }
