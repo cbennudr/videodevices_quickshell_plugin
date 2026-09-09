@@ -2,16 +2,26 @@
   "schemaVersion": 1,
   "id": "connor.videodevices",
   "name": "Video Devices",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "author": "Connor Bennudriti",
   "license": "MIT",
-  "description": "videodevices: a video device viewer",
-  "category": "Hardware",
+  "description": "Shows available video devices in the Omarchy bar",
   "kinds": [
-    "overlay"
+    "bar-widget"
   ],
-  "keepLoaded": true,
   "entryPoints": {
-    "overlay": "shell.qml"
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Video Devices",
+    "description": "Shows an icon whose tooltip lists the available video devices",
+    "category": "Hardware",
+    "aliases": [
+      "video",
+      "camera",
+      "webcam"
+    ],
+    "allowMultiple": false,
+    "defaultSection": "right"
   }
 }

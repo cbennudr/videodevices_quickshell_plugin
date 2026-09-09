@@ -1,7 +1,14 @@
-# Activate Linux Quickshell Plugin
+# Video Devices
 
+An Omarchy bar plugin that shows a video-camera icon in the right section of
+the bar. Hover over the icon to see the names of video devices exposed through
+Linux's `/sys/class/video4linux` interface. The list refreshes every five
+seconds and does not require `v4l2-ctl` or any other extra package.
 
-Copy to omarchy plugins directory
+## Install from this checkout
+
+Copy the plugin to the Omarchy plugins directory:
+
 ```bash
 cp -r . /home/connor/.config/omarchy/plugins/connor.videodevices
 ```
@@ -13,12 +20,8 @@ omarchy-shell shell rescanPlugins
 omarchy plugin enable connor.videodevices
 ```
 
-The enable command adds this entry to the top-level `plugins` array in
-`~/.config/omarchy/shell.json`:
-
-```json
-{ "id": "connor.videodevices" }
-```
+The enable command adds the widget to `~/.config/omarchy/shell.json`. Its
+manifest requests the right side of the bar by default.
 
 Changes under `~/.config/omarchy/plugins/` normally hot-reload. If needed, restart the shell with:
 
