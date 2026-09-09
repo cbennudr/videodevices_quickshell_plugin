@@ -10,7 +10,8 @@ seconds and does not require `v4l2-ctl` or any other extra package.
 Copy the plugin to the Omarchy plugins directory:
 
 ```bash
-cp -r . /home/connor/.config/omarchy/plugins/connor.videodevices
+# cp -r . /home/connor/.config/omarchy/plugins/connor.videodevices
+rsync -av --exclude '.git' . /home/connor/.config/omarchy/plugins/connor.videodevices
 ```
 
 Ask the running shell to discover it, then enable it:
