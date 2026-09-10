@@ -10,6 +10,41 @@ BarWidget {
 
   property var devices: []
   property bool popupOpen: false
+  readonly property var widthSamples: {
+    var samples = {
+      camera: "",
+      device: "No video devices available",
+      format: "No formats reported",
+      choice: ""
+    }
+
+    for (var cameraIndex = 0; cameraIndex < devices.length; cameraIndex++) {
+      var camera = devices[cameraIndex]
+      if (camera.name.length > samples.camera.length) samples.camera = camera.name
+
+      for (var nodeIndex = 0; nodeIndex < camera.nodes.length; nodeIndex++) {
+        var node = camera.nodes[nodeIndex]
+        if (node.path.length > samples.device.length) samples.device = node.path
+
+        for (var formatIndex = 0; formatIndex < node.formats.length; formatIndex++) {
+          var format = node.formats[formatIndex]
+          if (format.name.length > samples.format.length) samples.format = format.name
+
+          for (var sizeIndex = 0; sizeIndex < format.sizes.length; sizeIndex++) {
+            var size = format.sizes[sizeIndex]
+            if (size.intervals.length === 0 && size.name.length > samples.choice.length)
+              samples.choice = size.name
+
+            for (var intervalIndex = 0; intervalIndex < size.intervals.length; intervalIndex++) {
+              var choice = size.name + " — " + size.intervals[intervalIndex].name
+              if (choice.length > samples.choice.length) samples.choice = choice
+            }
+          }
+        }
+      }
+    }
+    return samples
+  }
 
   function syncPopup() {
     if (button.tooltipHovered || infoPopup.containsMouse) {
@@ -234,6 +269,36 @@ BarWidget {
     function close() { root.popupOpen = false }
   }
 
+  TextMetrics {
+    id: cameraMetrics
+    font.family: Style.font.family
+    font.pixelSize: Style.font.heading
+    font.bold: true
+    text: root.widthSamples.camera
+  }
+
+  TextMetrics {
+    id: deviceMetrics
+    font.family: Style.font.family
+    font.pixelSize: Style.font.body
+    font.bold: true
+    text: root.widthSamples.device
+  }
+
+  TextMetrics {
+    id: formatMetrics
+    font.family: Style.font.family
+    font.pixelSize: Style.font.body
+    text: root.widthSamples.format
+  }
+
+  TextMetrics {
+    id: choiceMetrics
+    font.family: Style.font.family
+    font.pixelSize: Style.font.bodySmall
+    text: root.widthSamples.choice
+  }
+
   PopupCard {
     id: infoPopup
     anchorItem: button
@@ -241,7 +306,13 @@ BarWidget {
     owner: popupOwner
     triggerMode: "hover"
     open: root.popupOpen
-    contentWidth: fittedContentWidth(Style.space(520))
+    contentWidth: fittedContentWidth(Math.ceil(Math.max(
+      Style.space(220),
+      cameraMetrics.width,
+      deviceMetrics.width,
+      Style.space(16) + formatMetrics.width,
+      Style.space(32) + choiceMetrics.width
+    ) + padding * 2 + Style.space(8)))
     contentHeight: fittedContentHeight(contentColumn.implicitHeight)
 
     onContainsMouseChanged: root.syncPopup()
