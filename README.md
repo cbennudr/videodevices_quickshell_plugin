@@ -16,17 +16,23 @@ omarchy pkg add v4l-utils gstreamer gst-plugins-base gst-plugins-good
 
 ## Install
 
-Run setup script
+Run the setup script from anywhere inside the cloned repository:
+
 ```bash
 bash setup.sh
 ```
 
+The script resolves the current user's home directory and installs to
+`$HOME/.config/omarchy/plugins/`.
+
 ### Install Manually
 
-Copy the plugin to the Omarchy plugins directory:
+Copy the plugin to the current user's Omarchy plugins directory:
 
 ```bash
-rsync -av --exclude '.git' . /home/connor/.config/omarchy/plugins/connor.videodevices
+plugin_dir="$HOME/.config/omarchy/plugins/connor.videodevices"
+mkdir -p "$plugin_dir"
+rsync -av --exclude '.git/' ./ "$plugin_dir/"
 ```
 
 Ask the running shell to discover it, then enable it:
