@@ -13,9 +13,19 @@ BarWidget {
   property bool popupOpen: false
   readonly property bool cameraControlled: {
     for (var cameraIndex = 0; cameraIndex < devices.length; cameraIndex++) {
-      if (devices[cameraIndex].pids.length > 0) return true
+      if (devices[cameraIndex].controllers.length > 0) return true
     }
     return false
+  }
+
+  function controllerSummary(camera) {
+    if (!camera || camera.controllers.length === 0) return "None"
+    var entries = []
+    for (var i = 0; i < camera.controllers.length; i++) {
+      var controller = camera.controllers[i]
+      entries.push(controller.pid + " (" + controller.name + ")")
+    }
+    return entries.join(", ")
   }
   readonly property var widthSamples: {
     var samples = {
@@ -32,8 +42,7 @@ BarWidget {
       if (camera.name.length > samples.camera.length) samples.camera = camera.name
       var serialLabel = "SN: " + camera.serial
       if (serialLabel.length > samples.serial.length) samples.serial = serialLabel
-      var controlledLabel = "Controlled by PID: "
-        + (camera.pids.length > 0 ? camera.pids.join(", ") : "None")
+      var controlledLabel = "Controlled by PID: " + controllerSummary(camera)
       if (controlledLabel.length > samples.controlled.length)
         samples.controlled = controlledLabel
 
@@ -155,7 +164,10 @@ BarWidget {
       "physical=$(udevadm info --query=property --property=ID_PATH --value --path=\"$device\" 2>/dev/null); " +
       "[ -n \"$serial\" ] || serial=unavailable; [ -n \"$physical\" ] || physical=\"$name\"; " +
       "pids=$(fuser \"/dev/${device##*/}\" 2>/dev/null); " +
-      "printf '@@DEVICE@@\\t%s\\t%s\\t%s\\t%s\\t/dev/%s\\n' \"$name\" \"$serial\" \"$physical\" \"$pids\" \"${device##*/}\" && " +
+      "printf '@@DEVICE@@\\t%s\\t%s\\t%s\\t/dev/%s' \"$name\" \"$serial\" \"$physical\" \"${device##*/}\"; " +
+      "for pid in $pids; do process=unknown; " +
+      "[ -r \"/proc/$pid/comm\" ] && IFS= read -r process < \"/proc/$pid/comm\"; " +
+      "printf '\\t%s\\t%s' \"$pid\" \"$process\"; done; printf '\\n'; " +
       "timeout 2s v4l2-ctl --device \"/dev/${device##*/}\" --list-formats-ext 2>/dev/null; " +
       "done"
     ]
@@ -174,13 +186,12 @@ BarWidget {
 
           if (line.indexOf("@@DEVICE@@\t") === 0) {
             var fields = line.split("\t")
-            if (fields.length < 6) continue
+            if (fields.length < 5) continue
 
             var cameraName = fields[1].trim()
             var cameraSerial = fields[2].trim()
             var physicalId = fields[3].trim()
-            var pidText = fields[4].trim()
-            var nodePath = fields[5].trim()
+            var nodePath = fields[4].trim()
             var camera = null
             for (var cameraIndex = 0; cameraIndex < groupedDevices.length; cameraIndex++) {
               if (groupedDevices[cameraIndex].name === cameraName
@@ -196,19 +207,26 @@ BarWidget {
                 name: cameraName,
                 serial: cameraSerial,
                 physicalId: physicalId,
-                pids: [],
+                controllers: [],
                 nodes: []
               }
               groupedDevices.push(camera)
             }
 
-            if (pidText !== "") {
-              var nodePids = pidText.split(/\s+/)
-              for (var pidIndex = 0; pidIndex < nodePids.length; pidIndex++) {
-                var pid = nodePids[pidIndex]
-                if (/^\d+$/.test(pid) && camera.pids.indexOf(pid) < 0)
-                  camera.pids.push(pid)
+            for (var controllerIndex = 5; controllerIndex + 1 < fields.length; controllerIndex += 2) {
+              var pid = fields[controllerIndex].trim()
+              var processName = fields[controllerIndex + 1].trim() || "unknown"
+              if (!/^\d+$/.test(pid)) continue
+
+              var knownController = false
+              for (var knownIndex = 0; knownIndex < camera.controllers.length; knownIndex++) {
+                if (camera.controllers[knownIndex].pid === pid) {
+                  knownController = true
+                  break
+                }
               }
+              if (!knownController)
+                camera.controllers.push({ pid: pid, name: processName })
             }
 
             currentNode = { path: nodePath, formats: [] }
@@ -434,8 +452,7 @@ BarWidget {
 
           Text {
             width: parent.width
-            text: "Controlled by PID: "
-              + (modelData.pids.length > 0 ? modelData.pids.join(", ") : "None")
+            text: "Controlled by PID: " + root.controllerSummary(modelData)
             color: Color.foreground
             opacity: 0.75
             font.family: Style.font.family
