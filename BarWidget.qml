@@ -15,6 +15,7 @@ BarWidget {
     var samples = {
       camera: "",
       serial: "SN: unavailable",
+      controlled: "Controlled by PID: None",
       device: "No video devices available",
       format: "No formats reported",
       choice: ""
@@ -25,6 +26,10 @@ BarWidget {
       if (camera.name.length > samples.camera.length) samples.camera = camera.name
       var serialLabel = "SN: " + camera.serial
       if (serialLabel.length > samples.serial.length) samples.serial = serialLabel
+      var controlledLabel = "Controlled by PID: "
+        + (camera.pids.length > 0 ? camera.pids.join(", ") : "None")
+      if (controlledLabel.length > samples.controlled.length)
+        samples.controlled = controlledLabel
 
       for (var nodeIndex = 0; nodeIndex < camera.nodes.length; nodeIndex++) {
         var node = camera.nodes[nodeIndex]
@@ -143,7 +148,8 @@ BarWidget {
       "serial=$(udevadm info --query=property --property=ID_SERIAL_SHORT --value --path=\"$device\" 2>/dev/null); " +
       "physical=$(udevadm info --query=property --property=ID_PATH --value --path=\"$device\" 2>/dev/null); " +
       "[ -n \"$serial\" ] || serial=unavailable; [ -n \"$physical\" ] || physical=\"$name\"; " +
-      "printf '@@DEVICE@@\\t%s\\t%s\\t%s\\t/dev/%s\\n' \"$name\" \"$serial\" \"$physical\" \"${device##*/}\" && " +
+      "pids=$(fuser \"/dev/${device##*/}\" 2>/dev/null); " +
+      "printf '@@DEVICE@@\\t%s\\t%s\\t%s\\t%s\\t/dev/%s\\n' \"$name\" \"$serial\" \"$physical\" \"$pids\" \"${device##*/}\" && " +
       "timeout 2s v4l2-ctl --device \"/dev/${device##*/}\" --list-formats-ext 2>/dev/null; " +
       "done"
     ]
@@ -162,12 +168,13 @@ BarWidget {
 
           if (line.indexOf("@@DEVICE@@\t") === 0) {
             var fields = line.split("\t")
-            if (fields.length < 5) continue
+            if (fields.length < 6) continue
 
             var cameraName = fields[1].trim()
             var cameraSerial = fields[2].trim()
             var physicalId = fields[3].trim()
-            var nodePath = fields[4].trim()
+            var pidText = fields[4].trim()
+            var nodePath = fields[5].trim()
             var camera = null
             for (var cameraIndex = 0; cameraIndex < groupedDevices.length; cameraIndex++) {
               if (groupedDevices[cameraIndex].name === cameraName
@@ -183,9 +190,19 @@ BarWidget {
                 name: cameraName,
                 serial: cameraSerial,
                 physicalId: physicalId,
+                pids: [],
                 nodes: []
               }
               groupedDevices.push(camera)
+            }
+
+            if (pidText !== "") {
+              var nodePids = pidText.split(/\s+/)
+              for (var pidIndex = 0; pidIndex < nodePids.length; pidIndex++) {
+                var pid = nodePids[pidIndex]
+                if (/^\d+$/.test(pid) && camera.pids.indexOf(pid) < 0)
+                  camera.pids.push(pid)
+              }
             }
 
             currentNode = { path: nodePath, formats: [] }
@@ -309,6 +326,13 @@ BarWidget {
   }
 
   TextMetrics {
+    id: controlledMetrics
+    font.family: Style.font.family
+    font.pixelSize: Style.font.bodySmall
+    text: root.widthSamples.controlled
+  }
+
+  TextMetrics {
     id: formatMetrics
     font.family: Style.font.family
     font.pixelSize: Style.font.body
@@ -333,6 +357,7 @@ BarWidget {
       Style.space(220),
       cameraMetrics.width,
       serialMetrics.width,
+      controlledMetrics.width,
       deviceMetrics.width,
       Style.space(16) + formatMetrics.width,
       Style.space(32) + choiceMetrics.width
@@ -393,6 +418,18 @@ BarWidget {
           Text {
             width: parent.width
             text: "SN: " + modelData.serial
+            color: Color.foreground
+            opacity: 0.75
+            font.family: Style.font.family
+            font.pixelSize: Style.font.bodySmall
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.Wrap
+          }
+
+          Text {
+            width: parent.width
+            text: "Controlled by PID: "
+              + (modelData.pids.length > 0 ? modelData.pids.join(", ") : "None")
             color: Color.foreground
             opacity: 0.75
             font.family: Style.font.family

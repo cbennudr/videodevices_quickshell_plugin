@@ -14,12 +14,18 @@ The plugin uses `v4l2-ctl` for device capabilities and GStreamer for previews:
 omarchy pkg add v4l-utils gstreamer gst-plugins-base gst-plugins-good
 ```
 
-## Install from this checkout
+## Install
+
+Run setup script
+```bash
+bash setup.sh
+```
+
+### Install Manually
 
 Copy the plugin to the Omarchy plugins directory:
 
 ```bash
-# cp -r . /home/connor/.config/omarchy/plugins/connor.videodevices
 rsync -av --exclude '.git' . /home/connor/.config/omarchy/plugins/connor.videodevices
 ```
 
