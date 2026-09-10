@@ -27,10 +27,20 @@ BarWidget {
     }
     return entries.join(", ")
   }
+
+  function busLabel(bus) {
+    if (!bus || bus === "unavailable") return "unavailable"
+    if (bus === "usb") return "USB"
+    if (bus === "pci") return "PCI"
+    if (bus === "platform") return "Platform"
+    return bus
+  }
+
   readonly property var widthSamples: {
     var samples = {
       camera: "",
       serial: "SN: unavailable",
+      identity: "Hardware ID: unavailable",
       controlled: "Controlled by PID: None",
       device: "No video devices available",
       format: "No formats reported",
@@ -42,6 +52,15 @@ BarWidget {
       if (camera.name.length > samples.camera.length) samples.camera = camera.name
       var serialLabel = "SN: " + camera.serial
       if (serialLabel.length > samples.serial.length) samples.serial = serialLabel
+      var identityLabels = [
+        "Driver: " + camera.driver,
+        "Bus: " + busLabel(camera.bus),
+        "Hardware ID: " + camera.hardwareId
+      ]
+      for (var identityIndex = 0; identityIndex < identityLabels.length; identityIndex++) {
+        if (identityLabels[identityIndex].length > samples.identity.length)
+          samples.identity = identityLabels[identityIndex]
+      }
       var controlledLabel = "Controlled by PID: " + controllerSummary(camera)
       if (controlledLabel.length > samples.controlled.length)
         samples.controlled = controlledLabel
@@ -162,9 +181,16 @@ BarWidget {
       "[ -r \"$device/name\" ] && IFS= read -r name < \"$device/name\" && " +
       "serial=$(udevadm info --query=property --property=ID_SERIAL_SHORT --value --path=\"$device\" 2>/dev/null); " +
       "physical=$(udevadm info --query=property --property=ID_PATH --value --path=\"$device\" 2>/dev/null); " +
+      "bus=$(udevadm info --query=property --property=ID_BUS --value --path=\"$device\" 2>/dev/null); " +
+      "vendor=$(udevadm info --query=property --property=ID_VENDOR_ID --value --path=\"$device\" 2>/dev/null); " +
+      "model=$(udevadm info --query=property --property=ID_MODEL_ID --value --path=\"$device\" 2>/dev/null); " +
+      "driver_link=$(readlink -f \"$device/device/driver\" 2>/dev/null); driver=${driver_link##*/}; " +
       "[ -n \"$serial\" ] || serial=unavailable; [ -n \"$physical\" ] || physical=\"$name\"; " +
+      "[ -n \"$driver\" ] || driver=unavailable; " +
+      "if [ -z \"$bus\" ]; then case \"$physical\" in platform-*) bus=platform;; pci-*) bus=pci;; *) bus=unavailable;; esac; fi; " +
+      "if [ -n \"$vendor\" ] && [ -n \"$model\" ]; then hardware=\"$vendor:$model\"; else hardware=unavailable; fi; " +
       "pids=$(fuser \"/dev/${device##*/}\" 2>/dev/null); " +
-      "printf '@@DEVICE@@\\t%s\\t%s\\t%s\\t/dev/%s' \"$name\" \"$serial\" \"$physical\" \"${device##*/}\"; " +
+      "printf '@@DEVICE@@\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t/dev/%s' \"$name\" \"$serial\" \"$physical\" \"$driver\" \"$bus\" \"$hardware\" \"${device##*/}\"; " +
       "for pid in $pids; do process=unknown; " +
       "[ -r \"/proc/$pid/comm\" ] && IFS= read -r process < \"/proc/$pid/comm\"; " +
       "printf '\\t%s\\t%s' \"$pid\" \"$process\"; done; printf '\\n'; " +
@@ -186,12 +212,15 @@ BarWidget {
 
           if (line.indexOf("@@DEVICE@@\t") === 0) {
             var fields = line.split("\t")
-            if (fields.length < 5) continue
+            if (fields.length < 8) continue
 
             var cameraName = fields[1].trim()
             var cameraSerial = fields[2].trim()
             var physicalId = fields[3].trim()
-            var nodePath = fields[4].trim()
+            var cameraDriver = fields[4].trim()
+            var cameraBus = fields[5].trim()
+            var hardwareId = fields[6].trim()
+            var nodePath = fields[7].trim()
             var camera = null
             for (var cameraIndex = 0; cameraIndex < groupedDevices.length; cameraIndex++) {
               if (groupedDevices[cameraIndex].name === cameraName
@@ -207,13 +236,16 @@ BarWidget {
                 name: cameraName,
                 serial: cameraSerial,
                 physicalId: physicalId,
+                driver: cameraDriver,
+                bus: cameraBus,
+                hardwareId: hardwareId,
                 controllers: [],
                 nodes: []
               }
               groupedDevices.push(camera)
             }
 
-            for (var controllerIndex = 5; controllerIndex + 1 < fields.length; controllerIndex += 2) {
+            for (var controllerIndex = 8; controllerIndex + 1 < fields.length; controllerIndex += 2) {
               var pid = fields[controllerIndex].trim()
               var processName = fields[controllerIndex + 1].trim() || "unknown"
               if (!/^\d+$/.test(pid)) continue
@@ -350,6 +382,13 @@ BarWidget {
   }
 
   TextMetrics {
+    id: identityMetrics
+    font.family: Style.font.family
+    font.pixelSize: Style.font.bodySmall
+    text: root.widthSamples.identity
+  }
+
+  TextMetrics {
     id: controlledMetrics
     font.family: Style.font.family
     font.pixelSize: Style.font.bodySmall
@@ -381,6 +420,7 @@ BarWidget {
       Style.space(220),
       cameraMetrics.width,
       serialMetrics.width,
+      identityMetrics.width,
       controlledMetrics.width,
       deviceMetrics.width,
       Style.space(16) + formatMetrics.width,
@@ -448,6 +488,26 @@ BarWidget {
             font.pixelSize: Style.font.bodySmall
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.Wrap
+          }
+
+          Repeater {
+            model: [
+              "Driver: " + modelData.driver,
+              "Bus: " + root.busLabel(modelData.bus),
+              "Hardware ID: " + modelData.hardwareId
+            ]
+
+            delegate: Text {
+              required property var modelData
+              width: parent.width
+              text: modelData
+              color: Color.foreground
+              opacity: 0.75
+              font.family: Style.font.family
+              font.pixelSize: Style.font.bodySmall
+              horizontalAlignment: Text.AlignHCenter
+              wrapMode: Text.Wrap
+            }
           }
 
           Text {
