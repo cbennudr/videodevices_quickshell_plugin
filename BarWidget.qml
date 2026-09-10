@@ -23,7 +23,7 @@ BarWidget {
     var entries = []
     for (var i = 0; i < camera.controllers.length; i++) {
       var controller = camera.controllers[i]
-      entries.push(controller.pid + " (" + controller.name + ")")
+      entries.push(controller.name + " (PID " + controller.pid + ")")
     }
     return entries.join(", ")
   }
@@ -41,7 +41,7 @@ BarWidget {
       camera: "",
       serial: "SN: unavailable",
       identity: "Hardware ID: unavailable",
-      controlled: "Controlled by PID: None",
+      controlled: "Controlled by: None",
       device: "No video devices available",
       format: "No formats reported",
       choice: ""
@@ -61,7 +61,7 @@ BarWidget {
         if (identityLabels[identityIndex].length > samples.identity.length)
           samples.identity = identityLabels[identityIndex]
       }
-      var controlledLabel = "Controlled by PID: " + controllerSummary(camera)
+      var controlledLabel = "Controlled by: " + controllerSummary(camera)
       if (controlledLabel.length > samples.controlled.length)
         samples.controlled = controlledLabel
 
@@ -512,7 +512,7 @@ BarWidget {
 
           Text {
             width: parent.width
-            text: "Controlled by PID: " + root.controllerSummary(modelData)
+            text: "Controlled by: " + root.controllerSummary(modelData)
             color: Color.foreground
             opacity: 0.75
             font.family: Style.font.family
