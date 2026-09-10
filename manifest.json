@@ -14,7 +14,7 @@
   },
   "barWidget": {
     "displayName": "Video Devices",
-    "description": "Shows an icon whose tooltip lists video device formats, resolutions, and frame rates",
+    "description": "Shows an icon whose tooltip lists video device formats, resolutions, and frame rates. Clicking one of the resolution/FPS options opens a widow displaying the video feed.",
     "category": "Hardware",
     "aliases": [
       "video",

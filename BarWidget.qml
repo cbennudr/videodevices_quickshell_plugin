@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
 import qs.Commons
@@ -336,14 +337,29 @@ BarWidget {
       Style.space(16) + formatMetrics.width,
       Style.space(32) + choiceMetrics.width
     ) + padding * 2 + Style.space(8)))
-    contentHeight: fittedContentHeight(contentColumn.implicitHeight)
+    contentHeight: fittedContentHeight(
+      contentColumn.implicitHeight,
+      screenH > 0 ? Math.floor(screenH * 2 / 3) : Style.space(640)
+    )
 
     onContainsMouseChanged: root.syncPopup()
 
-    Column {
-      id: contentColumn
+    Flickable {
+      id: popupFlick
       anchors.fill: parent
-      spacing: Style.space(10)
+      contentWidth: width
+      contentHeight: contentColumn.implicitHeight
+      clip: true
+      boundsBehavior: Flickable.StopAtBounds
+      flickableDirection: Flickable.VerticalFlick
+      interactive: contentHeight > height
+
+      ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+
+      Column {
+        id: contentColumn
+        width: popupFlick.width
+        spacing: Style.space(10)
 
       Text {
         visible: root.devices.length === 0
@@ -510,6 +526,8 @@ BarWidget {
         }
       }
     }
+  }
+
   }
 
   BarIconButton {
