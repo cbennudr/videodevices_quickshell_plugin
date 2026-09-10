@@ -11,6 +11,12 @@ BarWidget {
 
   property var devices: []
   property bool popupOpen: false
+  readonly property bool cameraControlled: {
+    for (var cameraIndex = 0; cameraIndex < devices.length; cameraIndex++) {
+      if (devices[cameraIndex].pids.length > 0) return true
+    }
+    return false
+  }
   readonly property var widthSamples: {
     var samples = {
       camera: "",
@@ -572,6 +578,8 @@ BarWidget {
     anchors.fill: parent
     bar: root.bar
     text: ""
+    active: root.cameraControlled
+    activeColor: "#4ade80"
     tooltipText: ""
     onTooltipHoveredChanged: root.syncPopup()
   }
