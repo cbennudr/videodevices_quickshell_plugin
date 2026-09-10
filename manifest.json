@@ -3,7 +3,7 @@
   "id": "connor.videodevices",
   "name": "Video Devices",
   "version": "1.0.0",
-  "author": "Connor Bennudriti",
+  "author": "Connor B",
   "license": "MIT",
   "description": "Shows video device formats, resolutions, and frame rates in the Omarchy bar",
   "kinds": [
